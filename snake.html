@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake — HTML/CSS/JS Game (A* Autoplay)</title>
+  <style>
+    /* -------------------------------
+       Color Variables (Easy Editing)
+    -------------------------------- */
+    :root {
+      --bg: #0f1724;        /* Background gradient top */
+      --panel: #071029;     /* Card / side panel background */
+      --accent: #00d1b2;    /* Button highlight color */
+      --danger: #ff4d6d;    /* Danger color (unused) */
+      --muted: #94a3b8;     /* Light gray text */
+    }
+    
+    /* Make all elements calculate size the same way */
+    * {
+      box-sizing: border-box;
+    }
+    
+    /* Full-screen background + global font */
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: Inter, system-ui, Segoe UI, Roboto, Arial;
+      background: linear-gradient(180deg, var(--bg), #02111b);
+      color: #e6eef6;
+    }
+    
+    /* Center the entire game card */
+    .wrap {
+      min-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+    }
+    
+    /* Main container: left = game, right = control panel */
+    .card {
+      width: min(920px, 96vw);
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+      padding: 20px;
+      border-radius: 16px;
+      background: linear-gradient(180deg,
+                  rgba(255,255,255,0.02),
+                  rgba(255,255,255,0.01));
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.7);
+    }
+    
+    /* On mobile, stack vertically */
+    @media (max-width: 880px) {
+      .card {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* The left game stage */
+    .stage {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    /* Game canvas */
+    canvas {
+      background: linear-gradient(180deg, #05202b, #02131a);
+      border-radius: 8px;
+      display: block;
+      max-width: 100%;
+    }
+    
+    /* Score / HUD section */
+    .hud {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin: 10px 0;
+    }
+    
+    /* Small HUD badges */
+    .chip {
+      background: rgba(255,255,255,0.03);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    
+    /* Right-side controls */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    /* Control panel background */
+    .panel {
+      background: linear-gradient(180deg,
+                  rgba(255,255,255,0.02),
+                  rgba(255,255,255,0.01));
+      padding: 14px;
+      border-radius: 12px;
+    }
+    
+    /* Headings and text */
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 20px;
+    }
+    
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    
+    /* Button groups */
+    .buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    
+    /* Buttons — simple outline buttons */
+    button {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: #e6eef6;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    /* Highlighted button (difficulty or autoplay) */
+    button.primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: #012018;
+    }
+    
+    /* Smaller button size */
+    .small {
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+    
+    /* Footer note text */
+    .footer {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    /* Arrow control buttons grid */
+    .arrow-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 56px);
+      gap: 6px;
+      justify-content: center;
+    }
+    
+    /* Arrow buttons */
+    .arrow-pad button {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+    }
+    
+    /* Tiny hint text */
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    
+    </style>    
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="stage">
+        <h1>Snake — Classic Arcade (A* Autoplay)</h1>
+        <p>Autoplay uses A* pathfinding to route the snake to the apple. You can still use controls to override.</p>
+
+        <div class="hud">
+          <div class="chip">Score: <span id="score">0</span></div>
+          <div class="chip">Speed: <span id="speedLabel">Normal</span></div>
+          <div class="chip">High Score: <span id="best">0</span></div>
+        </div>
+
+        <canvas id="c" width="560" height="560"></canvas>
+        <div class="hint">Tap on canvas to pause/resume. Mobile controls available on the right.</div>
+      </div>
+
+      <div class="panel">
+        <div class="controls">
+          <div>
+            <label style="font-weight:700">Difficulty</label>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="small" id="btnSlow">Slow</button>
+              <button class="small primary" id="btnNormal">Normal</button>
+              <button class="small" id="btnFast">Fast</button>
+            </div>
+          </div>
+
+          <div style="margin-top:8px">
+            <label style="font-weight:700">Actions</label>
+            <div class="buttons">
+              <button id="btnRestart">Restart</button>
+              <button id="btnGrow">Add Length</button>
+              <button id="btnCheat">Place Apple</button>
+            </div>
+          </div>
+
+          <div style="margin-top:8px">
+            <label style="font-weight:700">On-screen Controls</label>
+            <div class="arrow-pad" role="group" aria-label="arrow keys">
+              <div></div>
+              <button id="up">▲</button>
+              <div></div>
+              <button id="left">◀</button>
+              <button id="down">▼</button>
+              <button id="right">▶</button>
+            </div>
+          </div>
+
+          <div style="margin-top:8px">
+            <label style="font-weight:700">Autoplay</label>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button id="btnAutoplay" class="small primary">Autoplay: ON</button>
+            </div>
+          </div>
+
+          <div class="footer">Save the file as <code>snake_autoplay_astar.html</code> and open in a modern browser.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Config
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const speedLabel = document.getElementById('speedLabel');
+    const gridSize = 20; // cells per row/col
+    const cell = canvas.width / gridSize; // pixel size
+
+    // Game state
+    let snake, dir, apple, running, loopId, tickInterval, score, best;
+    let autoplay = true;
+
+    function init(difficulty='normal'){
+      snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+      dir = {x:1,y:0};
+      placeApple();
+      running = true;
+      score = 0;
+      best = Number(localStorage.getItem('snake_best')||0);
+      bestEl.textContent = best;
+      setDifficulty(difficulty);
+      scoreEl.textContent = score;
+      startLoop();
+    }
+
+    function setDifficulty(d){
+      if(d==='slow'){tickInterval=400;speedLabel.textContent='Slow';highlightButton('btnSlow');}
+      else if(d==='fast'){tickInterval=150;speedLabel.textContent='Fast';highlightButton('btnFast');}
+      else {tickInterval=250;speedLabel.textContent='Normal';highlightButton('btnNormal');}
+      // restart loop with new speed
+      if(loopId){clearInterval(loopId);startLoop();}
+    }
+
+    function highlightButton(id){['btnSlow','btnNormal','btnFast'].forEach(b=>document.getElementById(b).classList.remove('primary'));
+      document.getElementById(id).classList.add('primary');}
+
+    function startLoop(){
+      if(loopId) clearInterval(loopId);
+      loopId = setInterval(step,tickInterval);
+    }
+
+    function placeApple(){
+      while(true){
+        const ax = Math.floor(Math.random()*gridSize);
+        const ay = Math.floor(Math.random()*gridSize);
+        if(!snake.some(s=>s.x===ax && s.y===ay)){ apple = {x:ax,y:ay}; break; }
+      }
+    }
+
+    function step(){ if(!running) return; // compute autoplay direction before advancing
+      if(autoplay) computeAutoplayDir();
+      advance(); draw(); }
+
+    function advance(){
+      const head = {x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+      // collisions with walls
+      if(head.x<0||head.x>=gridSize||head.y<0||head.y>=gridSize){ gameOver(); return; }
+      // collision with self
+      if(snake.some(p=>p.x===head.x&&p.y===head.y)){ gameOver(); return; }
+      snake.unshift(head);
+      // apple
+      if(head.x===apple.x && head.y===apple.y){ score+=10; scoreEl.textContent=score; placeApple();
+        if(score>best){best=score; localStorage.setItem('snake_best',best); bestEl.textContent=best;}}
+      else snake.pop();
+    }
+
+    function gameOver(){ running=false; clearInterval(loopId); draw(); }
+
+    // input
+    window.addEventListener('keydown',e=>{
+      const k=e.key;
+      if(k==='ArrowUp'||k==='w'||k==='W') setDir(0,-1);
+      if(k==='ArrowDown'||k==='s'||k==='S') setDir(0,1);
+      if(k==='ArrowLeft'||k==='a'||k==='A') setDir(-1,0);
+      if(k==='ArrowRight'||k==='d'||k==='D') setDir(1,0);
+      if(k===' '||k==='Spacebar') toggleRun();
+    });
+
+    function setDir(dx,dy){
+      // prevent reversing
+      if(dir.x===-dx && dir.y===-dy) return;
+      dir={x:dx,y:dy};
+      // if player sets a direction, disable autoplay temporarily
+      // (but keep autoplay toggle button to re-enable)
+    }
+
+    document.getElementById('up').addEventListener('click',()=>setDir(0,-1));
+    document.getElementById('down').addEventListener('click',()=>setDir(0,1));
+    document.getElementById('left').addEventListener('click',()=>setDir(-1,0));
+    document.getElementById('right').addEventListener('click',()=>setDir(1,0));
+
+    document.getElementById('btnRestart').addEventListener('click',()=>init());
+    document.getElementById('btnGrow').addEventListener('click',()=>{snake.push({...snake[snake.length-1]});});
+    document.getElementById('btnCheat').addEventListener('click',()=>placeApple());
+    document.getElementById('btnSlow').addEventListener('click',()=>setDifficulty('slow'));
+    document.getElementById('btnNormal').addEventListener('click',()=>setDifficulty('normal'));
+    document.getElementById('btnFast').addEventListener('click',()=>setDifficulty('fast'));
+
+    const btnAutoplay = document.getElementById('btnAutoplay');
+    btnAutoplay.addEventListener('click',()=>{ autoplay = !autoplay; btnAutoplay.classList.toggle('primary'); btnAutoplay.textContent = 'Autoplay: ' + (autoplay? 'ON' : 'OFF'); });
+
+    // pause on tap
+    canvas.addEventListener('click',()=>{toggleRun();});
+    function toggleRun(){ if(running){ running=false; clearInterval(loopId);} else {running=true; startLoop();} }
+
+    // -------------------- A* PATHFINDING --------------------
+    // Returns an array of points from start (exclusive) to goal (inclusive). Each point {x,y}
+    function findPathAStar(start, goal, snakeBody){
+      const inBounds = (x,y)=>x>=0 && x<gridSize && y>=0 && y<gridSize;
+      const key = p=>`${p.x},${p.y}`;
+      // obstacles: all snake positions except the tail (since tail will move) - this is a heuristic simplification
+      const obstacles = new Set(snakeBody.slice(0,snakeBody.length-1).map(key));
+      // if goal is on an obstacle (rare), allow it (we'll walk onto it when tail moves)
+      // A* structures
+      const open = new Map(); // key -> node {pos,g,f, parentKey}
+      const closed = new Set();
+      function h(p){ return Math.abs(p.x - goal.x) + Math.abs(p.y - goal.y); }
+
+      const startKey = key(start);
+      open.set(startKey, {pos:start, g:0, f:h(start), parent:null});
+
+      while(open.size){
+        // pick node in open with lowest f (and lowest g as tiebreaker)
+        let currentKey, currentNode;
+        for(const [k,node] of open){
+          if(!currentNode || node.f < currentNode.f || (node.f===currentNode.f && node.g < currentNode.g)){ currentKey=k; currentNode=node; }
+        }
+        if(currentNode.pos.x===goal.x && currentNode.pos.y===goal.y){
+          // reconstruct path
+          const path=[];
+          let cur=currentNode;
+          while(cur.parent){ path.push(cur.pos); cur = open.get(cur.parent) || null; // parent might be in closed; we'll track parent chain using a separate map instead
+            // NOTE: above is fragile; better to store parentKey for every node and use a global cameFrom map
+            break; }
+          // Because of the fragile above, we'll do a safer reconstruct using cameFrom stored separately
+        }
+
+        // move current from open to closed
+        open.delete(currentKey);
+        closed.add(currentKey);
+
+        const neighbors = [ {x:currentNode.pos.x+1,y:currentNode.pos.y}, {x:currentNode.pos.x-1,y:currentNode.pos.y}, {x:currentNode.pos.x,y:currentNode.pos.y+1}, {x:currentNode.pos.x,y:currentNode.pos.y-1} ];
+        for(const n of neighbors){
+          if(!inBounds(n.x,n.y)) continue;
+          const nk = key(n);
+          if(closed.has(nk)) continue;
+          // if neighbor is obstacle and not the goal, skip
+          if(obstacles.has(nk) && !(n.x===goal.x && n.y===goal.y)) continue;
+          const tentative_g = currentNode.g + 1;
+          const existing = open.get(nk);
+          if(!existing || tentative_g < existing.g){
+            open.set(nk, {pos:{x:n.x,y:n.y}, g:tentative_g, f:tentative_g + h(n), parent:currentKey});
+          }
+        }
+      }
+
+      // The above attempt to reconstruct inside loop was avoided; we'll implement a clearer A* now (clean and correct)
+      // Clean A* implementation below (separate to avoid messy parent handling above)
+      // --- Clean A* ---
+      const startK = key(start);
+      const goalK = key(goal);
+      const closed2 = new Set();
+      const gScore = new Map();
+      const fScore = new Map();
+      const cameFrom = new Map();
+      const openSet = new Set();
+
+      gScore.set(startK, 0);
+      fScore.set(startK, h(start));
+      openSet.add(startK);
+
+      while(openSet.size){
+        // find node in openSet with lowest fScore
+        let current = null;
+        for(const k of openSet){
+          if(current===null || ( (fScore.get(k)||Infinity) < (fScore.get(current)||Infinity) ) || ( (fScore.get(k)||Infinity)===(fScore.get(current)||Infinity) && (gScore.get(k)||Infinity) < (gScore.get(current)||Infinity) )) current = k;
+        }
+        if(current===goalK){
+          // reconstruct path
+          const path = [];
+          let cur = current;
+          while(cameFrom.has(cur)){
+            const [x,y] = cur.split(',').map(Number);
+            path.push({x,y});
+            cur = cameFrom.get(cur);
+          }
+          path.reverse(); // path from start's neighbor ... goal
+          return path; // excludes start
+        }
+
+        openSet.delete(current);
+        closed2.add(current);
+        const [cx,cy] = current.split(',').map(Number);
+        const neighs = [ [cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1] ];
+        for(const [nx,ny] of neighs){
+          if(!inBounds(nx,ny)) continue;
+          const nk = nx+','+ny;
+          if(closed2.has(nk)) continue;
+          if(obstacles.has(nk) && nk !== goalK) continue;
+          const tentative_g = (gScore.get(current)||Infinity) + 1;
+          if(!openSet.has(nk)) openSet.add(nk);
+          else if(tentative_g >= (gScore.get(nk)||Infinity)) continue;
+          // this path is best until now
+          cameFrom.set(nk, current);
+          gScore.set(nk, tentative_g);
+          fScore.set(nk, tentative_g + Math.abs(nx - goal.x) + Math.abs(ny - goal.y));
+        }
+      }
+
+      // no path found
+      return null;
+    }
+
+    // Choose a safe fallback move (any non-colliding, non-reverse move)
+    function safeFallbackDir(){
+      const head = snake[0];
+      const candidates = [ {x:1,y:0}, {x:0,y:-1}, {x:-1,y:0}, {x:0,y:1} ]; // right, up, left, down preference
+      for(const d of candidates){
+        if(dir.x===-d.x && dir.y===-d.y) continue; // don't reverse
+        const nx = head.x + d.x; const ny = head.y + d.y;
+        if(nx<0||nx>=gridSize||ny<0||ny>=gridSize) continue;
+        if(snake.some(p=>p.x===nx&&p.y===ny)) continue;
+        return d;
+      }
+      // if nothing safe, return current (will likely collide)
+      return dir;
+    }
+
+    function computeAutoplayDir(){
+      const head = snake[0];
+      const path = findPathAStar({x:head.x,y:head.y}, {x:apple.x,y:apple.y}, snake);
+      if(path && path.length>0){
+        const next = path[0];
+        const ndx = next.x - head.x; const ndy = next.y - head.y;
+        // prevent reversing just in case
+        if(dir.x===-ndx && dir.y===-ndy){ // path asks to reverse (unlikely)
+          const fallback = safeFallbackDir(); dir = fallback; return;
+        }
+        dir = {x:ndx,y:ndy};
+      } else {
+        // no path found -- try to survive by following the tail or making a safe move
+        const fallback = safeFallbackDir(); dir = fallback;
+      }
+    }
+
+    // drawing
+    function draw(){
+      // background
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // grid subtle
+      ctx.fillStyle = '#041b20';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      // apple
+      drawCell(apple.x,apple.y, '#ff6b78');
+      // snake
+      for(let i=0;i<snake.length;i++){
+        const p=snake[i];
+        const brightness = 1 - i/snake.length*0.5;
+        const g = Math.floor(6+brightness*240);
+        const color = i===0? '#00ffbf' : `rgb(${Math.floor(20*brightness)},${g},${Math.floor(80*brightness)})`;
+        drawCell(p.x,p.y,color,true);
+      }
+
+      // if game over overlay
+      if(!running){
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '28px system-ui';
+        ctx.textAlign='center';
+        ctx.fillText('Game Over', canvas.width/2, canvas.height/2 - 8);
+        ctx.font = '16px system-ui';
+        ctx.fillText('Click Restart or tap the canvas to resume', canvas.width/2, canvas.height/2 + 20);
+      }
+    }
+
+    function drawCell(x,y,fill,withBorder=false){
+      const px = x*cell; const py = y*cell;
+      ctx.fillStyle = fill;
+      ctx.fillRect(px+2,py+2,cell-4,cell-4);
+      if(withBorder){ ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.strokeRect(px+2,py+2,cell-4,cell-4); }
+    }
+
+    // initialize
+    init('normal');
+    draw();
+
+    // make canvas responsive
+    function resizeCanvas(){
+      const maxW = Math.min(window.innerWidth*0.6,560);
+      const scale = maxW / 560;
+      canvas.style.width = Math.round(560*scale) + 'px';
+      canvas.style.height = Math.round(560*scale) + 'px';
+    }
+    window.addEventListener('resize',resizeCanvas); resizeCanvas();
+  </script>
+</body>
+</html>

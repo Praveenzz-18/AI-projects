@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Game Hub</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="icon">🎮</span>
+      <h1>AI <span class="accent">Game</span> Hub</h1>
+    </div>
+    <nav class="credits">Credits - Praveen B M, S Raghavendra, MahadevPrasad</nav>
+  </header>
+
+  <main class="container">
+    <p class="lead">Choose a game to play. <strong>Snake</strong> uses A* to predict path. <strong>Connect Four</strong> uses Minimax with α-β pruning.</p>
+
+    <section class="cards">
+      <article class="card">
+        <div class="card-left">
+          <div class="game-icon connect-icon" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="card-title">Connect Four</div>
+          <div class="card-desc">Drop 4 in a row to win against AI</div>
+          <div class="meta">Minimax (α & β pruning)</div>
+        </div>
+        <div class="card-right">
+          <div class="btn-row">
+            <a class="btn primary" id="play-connect" href="conn4\conn4.html">PLAY NOW</a>
+          </div>
+          <div class="small">VS Computer</div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-left">
+          <div class="game-icon snake-icon" aria-hidden="true">
+            <div class="s-dot"></div><div class="s-dot"></div><div class="s-dot head"></div>
+          </div>
+          <div class="card-title">Snake Game</div>
+          <div class="card-desc">Classic snake with A* path prediction</div>
+          <div class="meta">A* Pathfinding Algorithm</div>
+        </div>
+        <div class="card-right">
+          <div class="btn-row">
+            <a class="btn primary" id="play-snake" href="snake\snake.html">PLAY NOW</a>
+          </div>
+          <div class="small">Single Player</div>
+        </div>
+      </article>
+    </section>
+
+    <footer class="legend">
+      <span class="key"><span class="dot green"></span>Interactive Sounds</span>
+      <span class="key"><span class="dot yellow"></span>AI Algorithms</span>
+      <span class="key"><span class="dot purple"></span>Path Visualization</span>
+    </footer>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
